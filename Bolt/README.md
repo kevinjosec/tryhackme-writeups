@@ -129,8 +129,6 @@ Enter OS command , for exit "quit" :: cat /home/flag.txt
 - "Authenticated" RCE is still critical when credentials are weak or exposed; the authentication requirement offered no real protection here.
 - Running a service as root turns a single application bug into full host compromise — a clean illustration of why least privilege matters on the defensive side.
 
-> *[Add your own note: what was new for you, or where you got stuck — e.g. getting the exploit script running, or spotting the leaked password.]*
-
 ---
 
 ## 8. References
