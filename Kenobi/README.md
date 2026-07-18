@@ -20,7 +20,7 @@
 
 Kenobi is an Easy-rated Linux boot2root; the objective is to capture the user and root flags. The attack path chains three misconfigurations: an anonymous SMB share leaks a log file that confirms the service layout, an exposed NFS export (`/var`) provides a readable staging location, and the ProFTPD `mod_copy` flaw lets an unauthenticated attacker copy Kenobi's SSH key into that NFS-readable path for SSH access. Privilege escalation is then achieved by hijacking the `PATH` of a root-owned SUID binary.
 
-> **Note:** TryHackMe assigns a fresh IP each time the machine is deployed, so the target address differs between screenshots. Commands below use `$IP` as a placeholder — set it once per session with `export IP=<machine-ip>` and every command resolves automatically.
+> **Note:** TryHackMe assigns a fresh IP each time the machine is deployed, so the target address differs between screenshots. Commands below use `$IP` as a placeholder - set it once per session with `export IP=<machine-ip>` and every command resolves automatically.
 
 ---
 
@@ -38,13 +38,13 @@ ping -c 3 $IP
 nmap -sV $IP
 ```
 
-The scan showed **7 open ports**, including SSH (22), HTTP (80), RPCbind (111), SMB (445) and ProFTPD on FTP (21) — the three services (SMB, NFS, FTP) that form the attack path.
+The scan showed **7 open ports**, including SSH (22), HTTP (80), RPCbind (111), SMB (445) and ProFTPD on FTP (21) - the three services (SMB, NFS, FTP) that form the attack path.
 
 ---
 
 ## 3. Enumeration
 
-### Server Message Block (SMB) — port 445
+### Server Message Block (SMB) - port 445
 
 Enumerate shares and users with Nmap's SMB scripts:
 
@@ -66,32 +66,32 @@ smbclient //$IP/anonymous
 get log.txt
 ```
 
-`log.txt` confirmed the ProFTPD configuration and the location of Kenobi's SSH keys — useful context for the foothold.
+`log.txt` confirmed the ProFTPD configuration and the location of Kenobi's SSH keys - useful context for the foothold.
 
-### Network File System (NFS) — via RPCbind, port 111
+### Network File System (NFS) - via RPCbind, port 111
 
 ```bash
 nmap -p 111 --script=nfs-ls,nfs-statfs,nfs-showmount $IP
 ```
 
-The host exports **`/var`** over NFS — a location we can mount and read later.
+The host exports **`/var`** over NFS - a location we can mount and read later.
 
-### ProFTPD — port 21
+### ProFTPD - port 21
 
 ```bash
 searchsploit ProFTPd 1.3.5
 ```
 
-`searchsploit` returned **4** results for ProFTPD 1.3.5, including the `mod_copy` module — this version is vulnerable to CVE-2015-3306.
+`searchsploit` returned **4** results for ProFTPD 1.3.5, including the `mod_copy` module - this version is vulnerable to CVE-2015-3306.
 
 ---
 
-## 4. Exploitation — Initial Foothold
+## 4. Exploitation - Initial Foothold
 
-**Vulnerability:** ProFTPD 1.3.5 `mod_copy` — **CVE-2015-3306**
+**Vulnerability:** ProFTPD 1.3.5 `mod_copy` - **CVE-2015-3306**
 **Weakness:** Improper access control on the `SITE CPFR` / `SITE CPTO` commands (unauthenticated arbitrary file copy)
 
-**Why it works:** The `mod_copy` module in ProFTPD 1.3.5 exposes the `SITE CPFR` and `SITE CPTO` commands without requiring authentication. An unauthenticated attacker can use them to copy arbitrary files on the server — here, copying Kenobi's private SSH key out of his home directory into a location readable through the NFS export.
+**Why it works:** The `mod_copy` module in ProFTPD 1.3.5 exposes the `SITE CPFR` and `SITE CPTO` commands without requiring authentication. An unauthenticated attacker can use them to copy arbitrary files on the server - here, copying Kenobi's private SSH key out of his home directory into a location readable through the NFS export.
 
 **Steps**
 
@@ -193,10 +193,10 @@ This lists all SUID binaries. A non-standard binary, **`/usr/bin/menu`**, stood 
 
 ## 7. Lessons Learned
 
-- SMB enumeration — especially anonymous access — can expose a lot of useful context (shares, service config, file locations) before any credentials are involved. I initially underestimated how much is reachable unauthenticated.
+- SMB enumeration - especially anonymous access - can expose a lot of useful context (shares, service config, file locations) before any credentials are involved. I initially underestimated how much is reachable unauthenticated.
 - I lost time during the FTP vs SMB vs NFS mapping phase working out where the vulnerable service was actually exposed, and probed the wrong ports before enumerating shares properly.
 - This box sharpened my understanding of SUID + PATH-based privilege escalation, and how a small misconfiguration (a missing absolute path) leads straight to root.
-- Next time I'll commit to structured enumeration up front (Nmap → SMB enum → service validation) instead of jumping between tools — it makes the exploitation path faster and more logical.
+- Next time I'll commit to structured enumeration up front (Nmap → SMB enum → service validation) instead of jumping between tools - it makes the exploitation path faster and more logical.
 
 ---
 
@@ -204,8 +204,8 @@ This lists all SUID binaries. A non-standard binary, **`/usr/bin/menu`**, stood 
 
 - Room: https://tryhackme.com/room/kenobi
 - CVE-2015-3306 (ProFTPD `mod_copy`): https://nvd.nist.gov/vuln/detail/CVE-2015-3306
-- CWE-426: Untrusted Search Path — https://cwe.mitre.org/data/definitions/426.html
-- CWE-552: Files or Directories Accessible to External Parties — https://cwe.mitre.org/data/definitions/552.html
+- CWE-426: Untrusted Search Path - https://cwe.mitre.org/data/definitions/426.html
+- CWE-552: Files or Directories Accessible to External Parties - https://cwe.mitre.org/data/definitions/552.html
 
 ---
 

@@ -1,6 +1,6 @@
 # Bolt | TryHackMe Write-up
 
-> **TL;DR:** Fingerprinted a Bolt CMS instance on port 8000, recovered admin credentials that were leaked in two of the site's own blog posts, then used the Bolt 3.7.0 authenticated RCE exploit (EDB-48296) to gain command execution. Because the CMS was running as root, the exploit dropped straight into a root context — the box has no separate privilege-escalation stage.
+> **TL;DR:** Fingerprinted a Bolt CMS instance on port 8000, recovered admin credentials that were leaked in two of the site's own blog posts, then used the Bolt 3.7.0 authenticated RCE exploit (EDB-48296) to gain command execution. Because the CMS was running as root, the exploit dropped straight into a root context - the box has no separate privilege-escalation stage.
 
 |  |  |
 |---|---|
@@ -18,9 +18,9 @@
 
 ## 1. Overview
 
-Bolt is an Easy-rated web box built around the Bolt CMS, with a single flag as the objective. The path is short but realistic: the CMS is exposed on a non-standard port, the site's own content leaks the administrator's username and password, and those credentials unlock a known authenticated RCE in Bolt 3.7.0. The notable twist is that the web application runs as `root`, so code execution through the CMS is immediately root-level — there is no dedicated privilege-escalation step.
+Bolt is an Easy-rated web box built around the Bolt CMS, with a single flag as the objective. The path is short but realistic: the CMS is exposed on a non-standard port, the site's own content leaks the administrator's username and password, and those credentials unlock a known authenticated RCE in Bolt 3.7.0. The notable twist is that the web application runs as `root`, so code execution through the CMS is immediately root-level - there is no dedicated privilege-escalation step.
 
-> **Note:** TryHackMe assigns a fresh IP each time the machine is deployed, so the target address differs between screenshots. Commands below use `$IP` as a placeholder — set it once per session with `export IP=<machine-ip>` and every command resolves automatically. The CMS listens on port 8000, so web commands target `$IP:8000`.
+> **Note:** TryHackMe assigns a fresh IP each time the machine is deployed, so the target address differs between screenshots. Commands below use `$IP` as a placeholder - set it once per session with `export IP=<machine-ip>` and every command resolves automatically. The CMS listens on port 8000, so web commands target `$IP:8000`.
 
 ---
 
@@ -32,17 +32,17 @@ Bolt is an Easy-rated web box built around the Bolt CMS, with a single flag as t
 nmap -sV $IP
 ```
 
-Key findings — **3 open ports**:
+Key findings - **3 open ports**:
 
-- **22/tcp** — OpenSSH 7.6p1 (Ubuntu)
-- **80/tcp** — Apache httpd 2.4.29 (Ubuntu)
-- **8000/tcp** — HTTP, PHP 7.2.32. Nmap's service fingerprint of this port exposed **Bolt CMS** (page title "Bolt", "Bolt is unleashed"), making this the application of interest.
+- **22/tcp** - OpenSSH 7.6p1 (Ubuntu)
+- **80/tcp** - Apache httpd 2.4.29 (Ubuntu)
+- **8000/tcp** - HTTP, PHP 7.2.32. Nmap's service fingerprint of this port exposed **Bolt CMS** (page title "Bolt", "Bolt is unleashed"), making this the application of interest.
 
 ---
 
 ## 3. Enumeration
 
-### Content discovery — ports 80 and 8000
+### Content discovery - ports 80 and 8000
 
 ```bash
 gobuster dir -u http://$IP/ -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,txt,bak
@@ -51,12 +51,12 @@ gobuster dir -u http://$IP:8000/ -w /usr/share/seclists/Discovery/Web-Content/di
 
 Port 80 returned almost nothing of use. The Bolt application on port 8000 exposed `/index.php`, `/search` and `/pages`.
 
-### Browsing the CMS — credential disclosure
+### Browsing the CMS - credential disclosure
 
 The compromise starts in the site's own content. Two blog posts, both written by the admin, leak his credentials:
 
-- **"Message From Admin"** — the admin introduces himself as *Jake* and states his username is **`bolt`**.
-- **"Message for IT Department"** — the same admin posts his password in plaintext: **`boltadmin123`**.
+- **"Message From Admin"** - the admin introduces himself as *Jake* and states his username is **`bolt`**.
+- **"Message for IT Department"** - the same admin posts his password in plaintext: **`boltadmin123`**.
 
 Recovered credentials: **`bolt : boltadmin123`**
 
@@ -70,9 +70,9 @@ This returned **Bolt CMS 3.7.0 - Authenticated Remote Code Execution** (`php/web
 
 ---
 
-## 4. Exploitation — Initial Foothold
+## 4. Exploitation - Initial Foothold
 
-**Vulnerability:** Bolt CMS 3.7.0 authenticated RCE — **EDB-48296**
+**Vulnerability:** Bolt CMS 3.7.0 authenticated RCE - **EDB-48296**
 
 **Why it works:** With valid admin credentials, the exploit logs into Bolt, retrieves the login/CSRF token, and abuses the CMS's session handling to inject and execute PHP (session injection), yielding arbitrary command execution on the underlying host.
 
@@ -99,7 +99,7 @@ uid=0(root) gid=0(root) groups=0(root)
 
 ## 5. Privilege Escalation
 
-No separate privilege escalation was required. The Bolt CMS — and therefore the PHP process the exploit runs within — was executing as the **root** user, so the authenticated RCE in Section 4 already provided `uid=0`. This is itself the critical misconfiguration on the box: running a web application as root collapses the usual foothold-then-escalate path into a single step.
+No separate privilege escalation was required. The Bolt CMS - and therefore the PHP process the exploit runs within - was executing as the **root** user, so the authenticated RCE in Section 4 already provided `uid=0`. This is itself the critical misconfiguration on the box: running a web application as root collapses the usual foothold-then-escalate path into a single step.
 
 The root context was then used to locate and read the flag:
 
@@ -125,18 +125,18 @@ Enter OS command , for exit "quit" :: cat /home/flag.txt
 
 ## 7. Lessons Learned
 
-- Content is part of the attack surface — the entire compromise started with credentials an administrator posted in a blog entry. Enumerating what an application *says*, not just its directories, matters.
+- Content is part of the attack surface - the entire compromise started with credentials an administrator posted in a blog entry. Enumerating what an application *says*, not just its directories, matters.
 - "Authenticated" RCE is still critical when credentials are weak or exposed; the authentication requirement offered no real protection here.
-- Running a service as root turns a single application bug into full host compromise — a clean illustration of why least privilege matters on the defensive side.
+- Running a service as root turns a single application bug into full host compromise - a clean illustration of why least privilege matters on the defensive side.
 
 ---
 
 ## 8. References
 
 - Room: https://tryhackme.com/room/bolt
-- Bolt CMS 3.7.0 Authenticated RCE — Exploit-DB 48296: https://www.exploit-db.com/exploits/48296
-- CWE-250: Execution with Unnecessary Privileges — https://cwe.mitre.org/data/definitions/250.html
-- CWE-522: Insufficiently Protected Credentials — https://cwe.mitre.org/data/definitions/522.html
+- Bolt CMS 3.7.0 Authenticated RCE - Exploit-DB 48296: https://www.exploit-db.com/exploits/48296
+- CWE-250: Execution with Unnecessary Privileges - https://cwe.mitre.org/data/definitions/250.html
+- CWE-522: Insufficiently Protected Credentials - https://cwe.mitre.org/data/definitions/522.html
 
 ---
 
