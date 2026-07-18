@@ -1,4 +1,4 @@
-# Kenobi — TryHackMe Write-up
+# Kenobi | TryHackMe Write-up
 
 > **TL;DR:** Enumerated an anonymous SMB share and an exposed NFS export on a Linux host, abused the ProFTPD `mod_copy` vulnerability (CVE-2015-3306) to stage Kenobi's SSH private key into an NFS-readable directory for initial access, then escalated to root by PATH-hijacking a custom SUID binary (`/usr/bin/menu`).
 
