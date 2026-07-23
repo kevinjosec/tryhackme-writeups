@@ -8,7 +8,7 @@
 | **Room** | [OWASP Juice Shop](https://tryhackme.com/room/owaspjuiceshop) |
 | **Difficulty** | Easy |
 | **Category** | Web application security · OWASP Top 10 |
-| **Date completed** | `<YYYY-MM-DD>` |
+| **Date completed** | `2026-07-23` |
 | **Author** | Kevin Jose |
 
 **Tools used:** Browser DevTools · Burp Suite (Proxy · Intruder · Repeater) · `SecLists/best1050.txt`
